@@ -32,6 +32,8 @@ string command;
 
 int frameSize = 10;
 char* frame = new char[frameSize];
+const int NODES = 3;
+char addr[] = {0x50, 0x01};
 
 /** Get hexadecimal number from char
  */
@@ -58,8 +60,6 @@ string getResponse() {
 	while(Serial.available() && !cmdRecognized) {
 		buffer = Serial.read();
 		
-		// cout<<"Bufer:"<<buffer<<endl;
-		
 		//'/' is the begin of the command
 		if (buffer.compare("/") == 0) 
 			begin = true;
@@ -79,6 +79,10 @@ string getResponse() {
 		}
 	}
 	
+	if (cmd.compare("") == 0) {
+		cmd = "Can't get command";
+	}
+
 	return cmd;
 }
 
@@ -138,6 +142,18 @@ void sendFrame() {
 	delay(100);
 }
 
+/** Print the frame that will be sent
+ */
+void printFrame() {
+	cout<<"Frame: ";
+	for (int i = 0; i < frameSize; ++i) {
+		if (i != frameSize-1)
+			cout<<hex(frame[i])<<", ";
+		else
+			cout<<hex(frame[i])<<endl;
+	}
+}
+
 /** Setup the ports of raspberry
  */
 void setup(){
@@ -148,26 +164,19 @@ void setup(){
  */
 void loop() {
 	char msg[] = {"/490:"};
-	char addr[] = {0x50, 0x02};
-	getFrame(msg, addr, sizeof(msg));
+	
+	string response = "none";
 
-	cout<<"Frame1: ";
-	for (int i = 0; i < frameSize; ++i) {
-		if (i != frameSize-1)
-			cout<<hex(frame[i])<<", ";
-		else
-			cout<<hex(frame[i])<<endl;
+	for (int i = 0; i < NODES; ++i) {
+		addr[1] = i;
+
+		getFrame(msg, addr, sizeof(msg));
+		printFrame();
+		sendFrame();
+		
+		response = getResponse();
+		cout<<"Response: "<<response<<endl<<endl;
 	}
-
-	sendFrame();
-
-	command = getResponse();
-	if (command != "")
-		cout<<"Response: "<<command<<"\n";
-
-	char msg2[] = {"/490:"};
-	char addr2[] = {0x50, 0x01};
-	getFrame(msg2, addr2, sizeof(msg2));
 }
 
 /** Main function
