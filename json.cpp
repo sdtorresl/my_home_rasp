@@ -3,10 +3,12 @@
 #include <string>
 #include <stdio.h>
 #include <fstream>
+#include "home.h"
 
 using namespace std;
 using namespace rapidjson;
 
+const unsigned int HOME_ID = 1;
 string URL = "http://myhome.exeamedia.com";
 string FILE_NAME = "json.txt";
 
@@ -59,18 +61,67 @@ char* stringToChar(string str) {
 	return p;
 }
 
+char* appendCharToCharArray(char* array, char a) {
+  size_t len = strlen(array);
+
+  char* ret = new char[len+2];
+
+  strcpy(ret, array);    
+  ret[len] = a;
+  ret[len+1] = '\0';
+
+  return ret;
+}
+
 /** Main function
  */
 int main() {
-  string json = httpRequest("?function=getState\\&room_id=1\\&home_id=1\\home_password=myhome_pass");
 
-  cout<<json;
+  string json = httpRequest("?function=getHomeState\\&room_id=1\\&home_id=1\\&home_password=myhome_pass");
+
 	Document d;
   d.Parse<0>(json.c_str());
 
-  cout<< d["room"]["name"].GetString()<<endl;
-  cout<< d["success"].GetString()<<endl;
-  cout<< d["message"].GetString()<<endl;
 
+  int homeID, roomID, roomState, nodes, roomRealID;
+  bool success, control, mode;
+  string message, homeName, roomName;
+
+  success = d["success"].GetBool();
+  message = d["message"].GetString();
+
+  if (success) {
+    // Get data from JSON document
+    homeID = d["home"]["id"].GetInt();
+    homeName = d["home"]["name"].GetString();
+    mode = d["home"]["mode"].GetBool();
+    nodes = d["home"]["nodes"].GetInt();
+
+    Home house(homeID, homeName, mode);
+    house.createNodes(nodes);
+    house.printHomeData();
+
+    char currentRoom[] = "room_";
+
+    char cRoom[] = "room_1";
+    for (int i = 0; i < nodes; ++i) {
+      cRoom[5] = (char) (i + '0');
+
+      cout<<cRoom<<endl;
+      roomName = d["home"][cRoom]["name"].GetString();
+      roomID = d["home"][cRoom]["id"].GetInt();
+      control = d["home"][cRoom]["control"].GetBool();
+      roomState = d["home"][cRoom]["state"].GetInt();
+
+      house.setNodes(i, roomName, roomState, control);
+      house.printNodeData(i);
+    }
+  }
+  else {
+    cout<<message<<endl;
+  }
+  
+  //Remove json file and return
+  system(stringToChar("rm " + FILE_NAME));
   return 0;
 }
