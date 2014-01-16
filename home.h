@@ -72,7 +72,9 @@ class Home {
       bool mode;
       Room* nodes;
    public:
-      // Constructror parametrizado
+      // Constructor sin parámetros
+      Home(){}
+      // Constructor parametrizado
       Home(unsigned int homeIdRead, string homeNameRead, bool modeRead) : homeId(homeIdRead), homeName(homeNameRead), mode(modeRead) {}
       // Destructor
       ~Home() {}
@@ -91,6 +93,20 @@ class Home {
       void setHomeId(unsigned int homeIdRead);
       void setHomeName(string homeNameRead);
       void setMode(bool modeRead);
+      // Funciones que devuelven los valores de los nodos
+      unsigned int getNodeId(int nodeNumber){
+         return nodes[nodeNumber].getId();
+      }
+      string getNodeName(int nodeNumber){
+         return nodes[nodeNumber].getName();
+      }
+      int getNodeLevel(int nodeNumber){
+         return nodes[nodeNumber].getLevel();
+      }
+      bool getNodeControl(int nodeNumber){
+         return nodes[nodeNumber].getControl();
+      }
+
       // Función para llenar información del nodo
       void setNodes(unsigned int idRoom, string nameRead, int levelRead, bool controlRead);
       // Función para crear el número de nodos necesarios

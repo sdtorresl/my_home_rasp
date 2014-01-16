@@ -24,6 +24,11 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include "info.h"
+
+#include "lib/json/document.h"
+#include "home.h"
+
 
 using namespace std;
 
@@ -32,8 +37,23 @@ string command;
 
 int frameSize = 10;
 char* frame = new char[frameSize];
-const int NODES = 1;
+// const int NODES = 5;
+
 char addr[] = {0x50, 0x01};
+
+char msg = 35;
+
+// Size of the response from node
+int validResponseSize = 7;
+// Size of the node data
+int nodeDataSize = 14;
+// Node data
+char nodeData[10] = {0,0,0,0,0,0,0,0,0,0};
+// Buffer Node data
+int buffNodeData[10] = {0,0,0,0,0,0,0,0,0,0};
+
+// Stores the value of the json string
+Document d;
 
 /** Get hexadecimal number from char
  */
@@ -50,9 +70,6 @@ inline HexCharStruct hex(unsigned char _c) {
   	return HexCharStruct(_c);
 }
 
-
-
-
 /** Compute checksum for send a frame to xbee 
  */
 char checksum(char* frame) {
@@ -62,29 +79,17 @@ char checksum(char* frame) {
 	}
 	checksum = 0xFF & checksum;
 	checksum = 0xFF - checksum;
-
 	return checksum;
 }
 
 /** Create a new frame for xbee with a address and a message
  */
-void getFrame(char message[], char addr[], int size){
-	size--;
-	int totalSize = size + 9;
+void getFrame(char message, char addr[]){
+	int totalSize = 10;
 	char dh = addr[0];
 	char dl = addr[1];
 
-	//Resize the new frame array
-	char* newFrame = new char[totalSize];
-    memcpy(newFrame, frame, frameSize * sizeof(char));
-    
-    frameSize = totalSize;
-    //Delete old array
-    delete [] frame;
-    //Swap pointers and new size
-    frame = newFrame;
-    
-    frame[0] = 0x7E;
+	frame[0] = 0x7E;
     frame[1] = 0x00;
     frame[2] = totalSize - 4;
 	frame[3] = 0x01;
@@ -92,20 +97,15 @@ void getFrame(char message[], char addr[], int size){
 	frame[5] = dh;
 	frame[6] = dl;
 	frame[7] = 0x00;
-
-	for (int i = 8; i < totalSize-1; ++i) {
-		frame[i] = message[i-8];
-	}
-
+	frame[8] = message;
 	frame[totalSize-1] = checksum(frame);
 }
 
 /** Send frame for serial port
  */
 void sendFrame() {
-	cout<<"Sending frame...\n";
+	// cout<<"Sending frame...\n";
 	Serial.write(frame, frameSize);
-	delay(100);
 }
 
 /** Print the frame that will be sent
@@ -120,39 +120,72 @@ void printFrame() {
 	}
 }
 
-/* Read empty data */
-bool validateResponse(){
-	int validResponseSize = 7;
-
-	cout<<endl<<"Received Frame: ";
-	int d;
-	for(int i = 0; i < validResponseSize; i++){
-		d = Serial.read();
-		cout<<d<<" ";
-		if(i == validResponseSize-1){
-			if(d == 0x75)
-				return true;
-			else return false;
-		}
-	}
-
-	cout<<endl;
-}
-
-/** Get command from serial port
+/** Get data from serial port
  */
 bool getResponse() {
 	int responseSize = 0;
+	int serialCounter = 0;
 	
 	while(responseSize == 0){
 		responseSize = Serial.available();
+		if(serialCounter==100)
+			return false;
+		serialCounter++;
+		delay(1);
 	}
 
-	if(responseSize == 7)
-		return validateResponse();
-	else
+	serialCounter = 0;
+	
+	if(responseSize==8){
+		for(int i=0; i<responseSize; i++){
+			buffNodeData[i] = Serial.read();
+		}
+		responseSize = 0;
+
+		while(responseSize == 0){
+			responseSize = Serial.available();
+			if(serialCounter==100)
+				return false;
+			serialCounter++;
+			delay(1);
+		}
+
+		if(responseSize==2){
+			buffNodeData[8]=Serial.read();
+			buffNodeData[9]=Serial.read();
+			// Compare the direction from which the data is been sent
+			if(buffNodeData[5]==addr[1]){
+				for(int i=0; i<10; i++){
+					nodeData[i]=buffNodeData[i];
+					cout<<hex(nodeData[i])<<" ";
+
+				}
+				cout<<endl;
+				return true;
+			}
+			else return false;
+		}
+		else{
+			for(int i=0; i<responseSize; i++)
+				Serial.read();
+			return false;
+		}
+	
+	}
+	else{
+		for(int i=0; i<responseSize; i++)
+			Serial.read();
 		return false;
+	}
+
+
 }
+
+char getData(char addr) {
+
+	return 0;
+}
+
 
 /** Setup the ports of raspberry
  */
@@ -160,56 +193,105 @@ void setup(){
 	Serial.begin(9600);
 }
 
-bool flag = false;
-char msg[] = {"/900:"};
-
-void changeData(bool dataFlag){
-	if(dataFlag){
-		if(addr[1]==0x01)
-			msg[1] = '2';
-		else
-			msg[1] = '8';
-	}
-	else{
-		if(addr[1]==0x01)
-			msg[1] = '8';
-		else
-			msg[1] = '2';
-	}
-}
-
 /** This function repeats itself infinitely 
  */
 void loop() {
-	
-	changeData(flag);
+	// Get data from server and set into the house class
+	string json = httpRequest("?function=getHomeState\\&room_id=1\\&home_id=1\\&home_password=myhome_pass");
 
+	Document d;
+	d.Parse<0>(json.c_str());
 
-	bool validResponse = false;
-	int invalidCounter = 0;
+	int homeID, roomID, roomState, NODES, roomRealID;
+	bool success, control, mode;
+	string message, homeName, roomName;
 
-	getFrame(msg, addr, sizeof(msg));
-	printFrame();
+	success = d["success"].GetBool();
+	message = d["message"].GetString();
 
-	int nodeNumber = addr[1];
-	cout<<"Sending data to node #"<<nodeNumber<<endl;
-	while(!validResponse){
-		sendFrame();
-		validResponse = getResponse();
-		invalidCounter++;
+	Home house;
 
-		// 3 loops to send and validate data to-from node, if it's the third time then go sending data trough the other nodes
-		if(invalidCounter==3)
-			validResponse=true;
+	if (success) {
+		// Get data from JSON document
+		homeID = d["home"]["id"].GetInt();
+		homeName = d["home"]["name"].GetString();
+		mode = d["home"]["mode"].GetBool();
+		NODES = d["home"]["nodes"].GetInt();
+
+		house.setHomeId(homeID);
+		house.setHomeName(homeName);
+		house.setMode(mode);
+
+		house.createNodes(NODES);
+		house.printHomeData();
+
+		char cRoom[] = "room_1";
+		for (int i = 0; i < NODES; ++i) {
+	    	cRoom[5] = (char) (i + '0');
+	    	// cout<<cRoom<<endl;
+			roomName = d["home"][cRoom]["name"].GetString();
+			roomID = d["home"][cRoom]["id"].GetInt();
+			control = d["home"][cRoom]["control"].GetBool();
+			roomState = d["home"][cRoom]["state"].GetInt();
+
+			house.setNodes(i, roomName, roomState, control);
+			// house.printNodeData(i);
+		}
+	}
+	else {
+		cout<<message<<endl;
+	}
+		  
+	//Remove json file and return
+	system(stringToChar("rm " + FILE_NAME));
+
+	// Do everything of this if the control is done by the system 
+	if(control){
+		for(int i=0; i<NODES; i++){
+			// Get the message according to the actual Node
+			msg = house.getNodeLevel(i);
+
+			// Generate Frame
+			getFrame(msg, addr);
+			// Show the frame to be sent
+			printFrame();
+			// Send Frame
+			int nodeNumber = addr[1];
+			cout<<"Sending data to node #"<<nodeNumber<<endl;
+			sendFrame();
+
+			// Receive data: Switch State
+			bool flag = false;
+			int receiveDataCounter = 0;
+			while(!flag){
+				flag = getResponse();
+				if(receiveDataCounter==10){
+					flag=true;
+					cout<<"Bad Response from Node "<<nodeNumber<<endl;
+				}
+					
+				receiveDataCounter++;
+				delay(2);
+			}
+			cout<<endl<<endl;
+
+			// Post the data in server
+
+			
+			// Go to the next node address
+			addr[1]++;
+			// If we iterated through all the nodes then re-itialize and re-send data
+			if(addr[1] == NODES+1)
+				addr[1] = 0x01;
+
+			delay(1);
+		}
 	}
 
-	// Go to the next node address
-	addr[1]++;
-	// If we iterated through all the nodes then re-itialize and re-send data
-	if(addr[1] == NODES+1)
-		addr[1] = 0x02;
+	// Do the automatic algorithm
+	else{
 
-	cout<<endl;
+	}
 	
 }
 
@@ -218,13 +300,8 @@ void loop() {
 int main (){
 	setup();
 	while(1){
-		for(int i=0; i<NODES; i++){
-			loop();
-		}
-
-		flag != flag;
-		delay(500);		
+		loop();
+		delay(1);
 	}
-	
 	return (0);
 }
