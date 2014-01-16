@@ -197,13 +197,14 @@ void setup(){
  */
 void loop() {
 	// Get data from server and set into the house class
-	string json = httpRequest("?function=getHomeState\\&room_id=1\\&home_id=1\\&home_password=myhome_pass");
+	string json = httpRequest("?function=getHomeLevel\\&home_id=1\\&home_password=myhome_pass");
 
 	Document d;
 	d.Parse<0>(json.c_str());
 
-	int homeID, roomID, roomState, NODES, roomRealID;
-	bool success, control, mode;
+	int homeID, roomID, roomLevel, NODES, roomDL;
+	bool success, roomControl, roomAutomatic;
+	// bool mode;
 	string message, homeName, roomName;
 
 	success = d["success"].GetBool();
@@ -215,26 +216,28 @@ void loop() {
 		// Get data from JSON document
 		homeID = d["home"]["id"].GetInt();
 		homeName = d["home"]["name"].GetString();
-		mode = d["home"]["mode"].GetBool();
+		// mode = d["home"]["mode"].GetBool();
 		NODES = d["home"]["nodes"].GetInt();
 
 		house.setHomeId(homeID);
 		house.setHomeName(homeName);
-		house.setMode(mode);
+		// house.setMode(mode);
 
 		house.createNodes(NODES);
 		house.printHomeData();
 
-		char cRoom[] = "room_1";
+		char cRoom[] = "room_x";
 		for (int i = 0; i < NODES; ++i) {
 	    	cRoom[5] = (char) (i + '0');
 	    	// cout<<cRoom<<endl;
+	    	roomID = d["home"][cRoom]["id"].GetInt();
+	    	roomDL = d["home"][cRoom]["DL"].GetInt();
 			roomName = d["home"][cRoom]["name"].GetString();
-			roomID = d["home"][cRoom]["id"].GetInt();
-			control = d["home"][cRoom]["control"].GetBool();
-			roomState = d["home"][cRoom]["state"].GetInt();
+			roomLevel = d["home"][cRoom]["level"].GetInt();
+			roomControl = d["home"][cRoom]["control"].GetBool();
+			roomAutomatic = d["home"][cRoom]["automatic"].GetBool();
 
-			house.setNodes(i, roomName, roomState, control);
+			house.setNodes(i, roomID,roomDL, roomName, roomLevel, roomControl, roomAutomatic);
 			// house.printNodeData(i);
 		}
 	}
@@ -246,53 +249,60 @@ void loop() {
 	system(stringToChar("rm " + FILE_NAME));
 
 	// Do everything of this if the control is done by the system 
-	if(control){
-		for(int i=0; i<NODES; i++){
-			// Get the message according to the actual Node
-			msg = house.getNodeLevel(i);
-
-			// Generate Frame
-			getFrame(msg, addr);
-			// Show the frame to be sent
-			printFrame();
-			// Send Frame
-			int nodeNumber = addr[1];
-			cout<<"Sending data to node #"<<nodeNumber<<endl;
-			sendFrame();
-
-			// Receive data: Switch State
-			bool flag = false;
-			int receiveDataCounter = 0;
-			while(!flag){
-				flag = getResponse();
-				if(receiveDataCounter==10){
-					flag=true;
-					cout<<"Bad Response from Node "<<nodeNumber<<endl;
-				}
-					
-				receiveDataCounter++;
-				delay(2);
+	for(int i=0; i<NODES; i++){
+		addr[1] = house.getNodeDL(i);
+		
+		// If the control of the node phisically is enabled for system control
+		if(house.getNodeControl(i)){
+			if(house.getNodeAutomatic(i)) {
+				// Make the automatic
+				cout<<"The room "<<house.getNodeName(i)<<" is in automatic mode"<<endl;
 			}
-			cout<<endl<<endl;
+			else{
+				// Control made by the phone
+				cout<<"The room "<<house.getNodeName(i)<<" is controlled by phone"<<endl;
 
-			// Post the data in server
-
-			
-			// Go to the next node address
-			addr[1]++;
-			// If we iterated through all the nodes then re-itialize and re-send data
-			if(addr[1] == NODES+1)
-				addr[1] = 0x01;
-
-			delay(1);
+				// Get the message according to the actual Node
+				
+				msg = house.getNodeLevel(i);
+				
+				// Generate Frame
+				getFrame(msg, addr);
+				// Show the frame to be sent
+				printFrame();
+				// Send Frame
+				cout<<"Sending data to node #"<<i<<endl;
+				sendFrame();
+				// // Go to the next node address
+				// addr[1]++;
+				// // If we iterated through all the nodes then re-itialize and re-send data
+				// if(addr[1] == NODES+1)
+				// 	addr[1] = 0x01;
+			}
 		}
-	}
+		else{
+			cout<<"The room "<<house.getNodeName(i)<<" is disabled phisically"<<endl;
+		}
+		
+		// Receive data: Switch State
+		bool flag = false;
+		int receiveDataCounter = 0;
+		while(!flag){
+			flag = getResponse();
+			if(receiveDataCounter==10){
+				flag=true;
+				cout<<"Bad Response from Node "<<i<<endl;
+			}
+				
+			receiveDataCounter++;
+			delay(2);
+		}
+		// Post the data in server
 
-	// Do the automatic algorithm
-	else{
 
+		cout<<endl<<endl;
+		delay(1);
 	}
-	
 }
 
 /** Main function

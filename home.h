@@ -6,22 +6,27 @@ using namespace std;
 class Room {
    private:
       // Datos miembro de la clase "Room"
-      unsigned int id;  // id de la casa
+      unsigned int id;  // id de la habitación
+      unsigned int DL;  // DL del Xbee
       string name;      // nombre de la habitación
       int level;        // nivel de iluminación de la habitación
       bool control;     // control de la habitación: control por sistema o manual (on-off)
+      bool automatic;   // control de la habitación desde el celular: por teléfono o por sensores
       
    public:
       // Constructor sin parámetros
       Room(){}
       // Constructor parametrizado
-      Room(unsigned int idRoom, string nameRead, int levelRead, bool controlRead) : id(idRoom), name(nameRead), level(levelRead), control(controlRead) {}
+      Room(unsigned int idRoom, unsigned int DLRead, string nameRead, int levelRead, bool controlRead, bool automaticRead) : id(idRoom), DL(DLRead), name(nameRead), level(levelRead), control(controlRead), automatic(automaticRead) {}
       // Destructor
       ~Room(){}
       /* Funciones miembro de la clase "Room" */
       // Funciones para obtener los valores almacenados en el Room
       unsigned int getId(){
          return id;
+      }
+      unsigned int getDL(){
+         return DL;
       }
       string getName(){
          return name;
@@ -32,17 +37,26 @@ class Room {
       bool getControl(){
          return control;
       }
+      bool getAutomatic(){
+         return automatic;
+      }
       // Funciones para almacenar los valores del Room
       void setId(unsigned int idRead);
+      void setDL(unsigned int DLRead);
       void setName(string nameRead);
       void setLevel(int levelRead);
       void setControl(bool controlRead);
+      void setAutomatic(bool automaticRead);
       // Función para almacenar la información recibida en las variables
-      void setData(unsigned int idRead, string nameRead, int levelRead, bool controlRead);
+      void setData(unsigned int idRead, unsigned int DLRead, string nameRead, int levelRead, bool controlRead, bool automaticRead);
 };
 
 void Room::setId(unsigned int idRead){
    id = idRead;
+}
+
+void Room::setDL(unsigned int DLRead){
+   DL = DLRead;
 }
 
 void Room::setName(string nameRead){
@@ -57,11 +71,17 @@ void Room::setControl(bool controlRead){
    control = controlRead;
 }
 
-void Room::setData(unsigned int idRead, string nameRead, int levelRead, bool controlRead){
+void Room::setAutomatic(bool automaticRead){
+   automatic = automaticRead;
+}
+
+void Room::setData(unsigned int idRead, unsigned int DLRead, string nameRead, int levelRead, bool controlRead, bool automaticRead){
    id = idRead;
+   DL = DLRead;
    name = nameRead;
    level = levelRead;
    control = controlRead;
+   automatic = automaticRead;
 }
 
 class Home {
@@ -97,6 +117,9 @@ class Home {
       unsigned int getNodeId(int nodeNumber){
          return nodes[nodeNumber].getId();
       }
+      unsigned int getNodeDL(int nodeNumber){
+         return nodes[nodeNumber].getDL();
+      }
       string getNodeName(int nodeNumber){
          return nodes[nodeNumber].getName();
       }
@@ -106,9 +129,12 @@ class Home {
       bool getNodeControl(int nodeNumber){
          return nodes[nodeNumber].getControl();
       }
+      bool getNodeAutomatic(int nodeNumber){
+         return nodes[nodeNumber].getAutomatic();
+      }
 
       // Función para llenar información del nodo
-      void setNodes(unsigned int idRoom, string nameRead, int levelRead, bool controlRead);
+      void setNodes(int nodeNumber, unsigned int idRead, unsigned int DLRead, string nameRead, int levelRead, bool controlRead, bool automaticRead);
       // Función para crear el número de nodos necesarios
       void createNodes(int roomsNumber);
       // Función para imprimir la información almacenada de la casa
@@ -129,8 +155,8 @@ void Home::setMode(bool modeRead){
    mode = modeRead;
 }
 
-void Home::setNodes(unsigned int idRoom, string nameRead, int levelRead, bool controlRead){
-   nodes[idRoom].setData(idRoom,nameRead,levelRead,controlRead);
+void Home::setNodes(int nodeNumber, unsigned int idRead, unsigned int DLRead, string nameRead, int levelRead, bool controlRead, bool automaticRead){
+   nodes[nodeNumber].setData(idRead,DLRead,nameRead,levelRead,controlRead,automaticRead);
 }
 
 void Home::createNodes(int roomsNumber){
@@ -140,16 +166,20 @@ void Home::createNodes(int roomsNumber){
 void Home::printHomeData(){
    cout<<"House ID: "<<homeId<<endl;
    cout<<"House Name: "<<homeName<<endl;
-   cout<<"Control Mode: "<<mode<<endl;
+   // cout<<"Control Mode: "<<mode<<endl;
 }
 
 void Home::printNodeData(int nodeNumber){
    cout<<"Node ID: "<< nodes[nodeNumber].getId();
+   cout<<endl;
+   cout<<"Node DL: "<< nodes[nodeNumber].getDL();
    cout<<endl;
    cout<<"Node Name: "<< nodes[nodeNumber].getName();
    cout<<endl;
    cout<<"Node Level: "<< nodes[nodeNumber].getLevel();
    cout<<endl;
    cout<<"Node Control: "<< nodes[nodeNumber].getControl();
+   cout<<endl;
+   cout<<"Node Automatic: "<< nodes[nodeNumber].getAutomatic();
    cout<<endl;
 }
